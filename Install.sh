@@ -224,10 +224,10 @@ do_install() {
     echo -e "${BLUE}╚════════════════════════════════════╝${NC}"
     echo ""
     
-    # Usuń stary symlink przed rozpoczęciem instalacji
+    # Usuń stary symlink przed rozpoczęciem instalacji (wymaga sudo)
     if [ -L "$SYMLINK_PATH" ] || [ -e "$SYMLINK_PATH" ]; then
         info "Usuwanie starego symlinku..."
-        if sudo rm -f "$SYMLINK_PATH" 2>/dev/null; then
+        if sudo rm -rf "$SYMLINK_PATH" 2>/dev/null; then
             success "Stary symlink usunięty"
         else
             warning "Nie można usunąć starego symlinku (kontynuuję instalację)"
@@ -339,12 +339,12 @@ EOFWRAPPER
     echo -e "${GREEN}║        INSTALACJA UKOŃCZONA!       ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════╝${NC}"
     echo ""
-    info "Uruchom przez:"
+    echo -e "${BLUE}[ℹ]${NC} Uruchom przez:"
     
     if [ -L "$SYMLINK_PATH" ] && [ -x "$SYMLINK_PATH" ]; then
-        echo "  ${YELLOW}ui-manager${NC}"
+        echo -e "  ${YELLOW}ui-manager${NC}"
     fi
-    echo "  ${YELLOW}$INSTALL_DIR/ui-manager${NC}"
+    echo -e "  ${YELLOW}${INSTALL_DIR}/ui-manager${NC}"
     echo ""
     
     read -p "Uruchomić teraz? (y/n): " run_now
@@ -418,10 +418,10 @@ do_update() {
         return
     fi
     
-    # Usuń stary symlink przed aktualizacją
-    if [ -L "$SYMLINK_PATH" ]; then
+    # Usuń stary symlink przed aktualizacją (wymaga sudo)
+    if [ -L "$SYMLINK_PATH" ] || [ -e "$SYMLINK_PATH" ]; then
         info "Usuwanie starego symlinku przed aktualizacją..."
-        sudo rm -f "$SYMLINK_PATH" 2>/dev/null
+        sudo rm -rf "$SYMLINK_PATH" 2>/dev/null
         echo ""
     fi
     
