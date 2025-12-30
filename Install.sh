@@ -226,18 +226,18 @@ do_install() {
     info "Tworzenie skryptu uruchamiającego..."
     cat > "$INSTALL_DIR/ui-manager" << 'EOF'
 #!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
-exec ./ui.sh "$@"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+exec bash ./ui.sh "$@"
 EOF
     chmod +x "$INSTALL_DIR/ui-manager"
     
     # Utwórz symlink
     info "Tworzenie linku systemowego..."
-    if [ -w "/usr/local/bin" ]; then
-        ln -sf "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH"
+    if [ -w "$(dirname "$SYMLINK_PATH")" ]; then
+        ln -sf "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH" 2>/dev/null
     else
-        sudo ln -sf "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH"
+        sudo ln -sf "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH" 2>/dev/null
     fi
     
     if [ -L "$SYMLINK_PATH" ]; then
