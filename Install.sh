@@ -165,21 +165,35 @@ create_symlink() {
     
     info "Tworzenie linku systemowego..."
     
+    # Sprawdź czy target istnieje
+    if [ ! -f "$target" ]; then
+        error "Plik docelowy nie istnieje: $target"
+        return 1
+    fi
+    
+    # Sprawdź czy target jest wykonywalny
+    if [ ! -x "$target" ]; then
+        warning "Plik docelowy nie jest wykonywalny, nadaję uprawnienia..."
+        chmod +x "$target"
+    fi
+    
     # Usuń wszystkie stare wersje linku (również uszkodzone symlinki)
     if [ -L "$link" ]; then
         # To jest symlink (może być uszkodzony)
+        info "Wykryto stary symlink, usuwam..."
         if sudo rm -f "$link" 2>/dev/null; then
-            info "Usunięto stary symlink"
+            success "Usunięto stary symlink"
         else
-            warning "Nie można usunąć starego symlinku"
+            error "Nie można usunąć starego symlinku"
             return 1
         fi
     elif [ -e "$link" ]; then
         # To jest zwykły plik/katalog
+        warning "Wykryto plik w lokalizacji symlinku, usuwam..."
         if sudo rm -rf "$link" 2>/dev/null; then
-            info "Usunięto stary plik"
+            success "Usunięto stary plik"
         else
-            warning "Nie można usunąć starego pliku"
+            error "Nie można usunąć starego pliku"
             return 1
         fi
     fi
@@ -187,32 +201,70 @@ create_symlink() {
     # Upewnij się że katalog docelowy istnieje
     local link_dir="$(dirname "$link")"
     if [ ! -d "$link_dir" ]; then
+        info "Tworzę katalog: $link_dir"
         if ! sudo mkdir -p "$link_dir" 2>/dev/null; then
-            warning "Nie można utworzyć katalogu $link_dir"
+            error "Nie można utworzyć katalogu $link_dir"
             return 1
         fi
     fi
     
-    # Utwórz nowy link
-    if sudo ln -sf "$target" "$link" 2>/dev/null; then
+    # Utwórz nowy link (użyj pełnej ścieżki bezwzględnej)
+    info "Tworzę symlink: $link -> $target"
+    if sudo ln -sf "$target" "$link" 2>&1 | tee /tmp/symlink_error.log; then
+        # Krótkie opóźnienie dla systemu plików
+        sleep 0.5
+        
         # Weryfikuj czy link działa
-        if [ -L "$link" ] && [ -e "$link" ]; then
-            success "Link utworzony: $link -> $target"
+        if [ -L "$link" ]; then
+            success "Symlink utworzony"
+            
+            # Sprawdź czy link wskazuje na właściwy cel
+            local actual_target=$(readlink -f "$link" 2>/dev/null)
+            local expected_target=$(readlink -f "$target" 2>/dev/null)
+            
+            if [ "$actual_target" = "$expected_target" ]; then
+                success "Link wskazuje na właściwy cel"
+            else
+                warning "Link może wskazywać na niewłaściwy cel"
+                info "Oczekiwano: $expected_target"
+                info "Faktyczny: $actual_target"
+            fi
+            
+            # Sprawdź czy link jest dostępny
+            if [ -e "$link" ]; then
+                success "Link jest dostępny"
+            else
+                error "Link istnieje ale jest uszkodzony"
+                return 1
+            fi
             
             # Sprawdź czy link jest wykonywalny
             if [ -x "$link" ]; then
-                success "Link jest wykonywalny"
+                success "Link jest wykonywalny ✓"
                 return 0
             else
-                warning "Link nie jest wykonywalny"
-                return 1
+                warning "Link nie jest wykonywalny, próbuję naprawić..."
+                sudo chmod +x "$link" 2>/dev/null
+                if [ -x "$link" ]; then
+                    success "Naprawiono uprawnienia"
+                    return 0
+                else
+                    error "Nie można nadać uprawnień wykonywania"
+                    return 1
+                fi
             fi
         else
-            warning "Link utworzony ale nie działa poprawnie"
+            error "Symlink nie został utworzony poprawnie"
+            if [ -f /tmp/symlink_error.log ]; then
+                cat /tmp/symlink_error.log
+            fi
             return 1
         fi
     else
-        warning "Nie można utworzyć linku"
+        error "Nie można utworzyć linku (błąd ln)"
+        if [ -f /tmp/symlink_error.log ]; then
+            cat /tmp/symlink_error.log
+        fi
         return 1
     fi
 }
