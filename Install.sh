@@ -7,8 +7,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-INSTALL_DIR="$HOME/.local/bin/ui-manager"
-SYMLINK_PATH="/usr/local/bin/ui-manager"
+INSTALL_DIR="$HOME/.local/bin/toolbox"
+SYMLINK_PATH="/usr/local/bin/toolbox"
 
 success() { echo -e "${GREEN}[✔]${NC} $*"; }
 error() { echo -e "${RED}[✖]${NC} $*"; }
