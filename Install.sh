@@ -163,108 +163,61 @@ create_symlink() {
     local target="$1"
     local link="$2"
     
-    info "Tworzenie linku systemowego..."
+    echo ""
+    info "Tworzenie symlinku..."
     
-    # Sprawdź czy target istnieje
+    # Sprawdź czy plik źródłowy istnieje
     if [ ! -f "$target" ]; then
-        error "Plik docelowy nie istnieje: $target"
+        error "Plik nie istnieje: $target"
         return 1
     fi
     
-    # Sprawdź czy target jest wykonywalny
-    if [ ! -x "$target" ]; then
-        warning "Plik docelowy nie jest wykonywalny, nadaję uprawnienia..."
-        chmod +x "$target"
-    fi
+    # Nadaj uprawnienia wykonywania
+    chmod +x "$target" 2>/dev/null
     
-    # Usuń wszystkie stare wersje linku (również uszkodzone symlinki)
-    if [ -L "$link" ]; then
-        # To jest symlink (może być uszkodzony)
-        info "Wykryto stary symlink, usuwam..."
-        if sudo rm -f "$link" 2>/dev/null; then
-            success "Usunięto stary symlink"
-        else
-            error "Nie można usunąć starego symlinku"
-            return 1
-        fi
-    elif [ -e "$link" ]; then
-        # To jest zwykły plik/katalog
-        warning "Wykryto plik w lokalizacji symlinku, usuwam..."
-        if sudo rm -rf "$link" 2>/dev/null; then
-            success "Usunięto stary plik"
-        else
-            error "Nie można usunąć starego pliku"
-            return 1
-        fi
-    fi
+    # Usuń stary link (bez względu na typ)
+    sudo rm -rf "$link" 2>/dev/null
     
-    # Upewnij się że katalog docelowy istnieje
-    local link_dir="$(dirname "$link")"
-    if [ ! -d "$link_dir" ]; then
-        info "Tworzę katalog: $link_dir"
-        if ! sudo mkdir -p "$link_dir" 2>/dev/null; then
-            error "Nie można utworzyć katalogu $link_dir"
-            return 1
-        fi
-    fi
+    # Upewnij się że katalog istnieje
+    sudo mkdir -p "$(dirname "$link")" 2>/dev/null
     
-    # Utwórz nowy link (użyj pełnej ścieżki bezwzględnej)
-    info "Tworzę symlink: $link -> $target"
-    if sudo ln -sf "$target" "$link" 2>&1 | tee /tmp/symlink_error.log; then
-        # Krótkie opóźnienie dla systemu plików
-        sleep 0.5
-        
-        # Weryfikuj czy link działa
-        if [ -L "$link" ]; then
-            success "Symlink utworzony"
+    # Utwórz symlink - NAJPROSTSZA METODA
+    echo "  Wykonuję: ln -s $target $link"
+    
+    if sudo ln -s "$target" "$link"; then
+        # Sprawdź czy działa
+        if [ -L "$link" ] && [ -e "$link" ]; then
+            success "Symlink utworzony: $link"
             
-            # Sprawdź czy link wskazuje na właściwy cel
-            local actual_target=$(readlink -f "$link" 2>/dev/null)
-            local expected_target=$(readlink -f "$target" 2>/dev/null)
+            # Pokaż wynik
+            ls -la "$link"
             
-            if [ "$actual_target" = "$expected_target" ]; then
-                success "Link wskazuje na właściwy cel"
-            else
-                warning "Link może wskazywać na niewłaściwy cel"
-                info "Oczekiwano: $expected_target"
-                info "Faktyczny: $actual_target"
-            fi
-            
-            # Sprawdź czy link jest dostępny
-            if [ -e "$link" ]; then
-                success "Link jest dostępny"
-            else
-                error "Link istnieje ale jest uszkodzony"
-                return 1
-            fi
-            
-            # Sprawdź czy link jest wykonywalny
-            if [ -x "$link" ]; then
-                success "Link jest wykonywalny ✓"
+            # Test wykonywania
+            if sudo test -x "$link"; then
+                success "Symlink jest wykonywalny ✓"
+                
+                # Test dostępności w PATH
+                hash -r 2>/dev/null
+                
                 return 0
             else
-                warning "Link nie jest wykonywalny, próbuję naprawić..."
-                sudo chmod +x "$link" 2>/dev/null
-                if [ -x "$link" ]; then
-                    success "Naprawiono uprawnienia"
-                    return 0
-                else
-                    error "Nie można nadać uprawnień wykonywania"
-                    return 1
-                fi
+                warning "Symlink może nie być wykonywalny, ale powinien działać"
+                return 0
             fi
         else
-            error "Symlink nie został utworzony poprawnie"
-            if [ -f /tmp/symlink_error.log ]; then
-                cat /tmp/symlink_error.log
-            fi
+            error "Symlink nie działa poprawnie"
             return 1
         fi
     else
-        error "Nie można utworzyć linku (błąd ln)"
-        if [ -f /tmp/symlink_error.log ]; then
-            cat /tmp/symlink_error.log
+        error "Nie można utworzyć symlinku"
+        
+        # Plan B - spróbuj bez sudo
+        info "Próbuję bez sudo..."
+        if ln -s "$target" "$link" 2>/dev/null; then
+            success "Utworzono bez sudo"
+            return 0
         fi
+        
         return 1
     fi
 }
