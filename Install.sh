@@ -8,7 +8,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 INSTALL_DIR="$HOME/.local/bin/ui-manager"
-SYMLINK_PATH="/usr/local/bin/toolbox"
+SYMLINK_PATH="/usr/local/bin/uikit"
 
 success() { echo -e "${GREEN}[✔]${NC} $*"; }
 error() { echo -e "${RED}[✖]${NC} $*"; }
@@ -342,7 +342,7 @@ EOFWRAPPER
     echo -e "${BLUE}[ℹ]${NC} Uruchom przez:"
     
     if [ -L "$SYMLINK_PATH" ] && [ -x "$SYMLINK_PATH" ]; then
-        echo -e "  ${YELLOW}toolbox${NC}"
+        echo -e "  ${YELLOW}uikit${NC}"
     fi
     echo -e "  ${YELLOW}${INSTALL_DIR}/ui-manager${NC}"
     echo ""
