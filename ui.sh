@@ -3,7 +3,7 @@
 # Sprawdź czy functions.sh istnieje
 if [ ! -f "$(dirname "$0")/functions.sh" ]; then
     echo "Błąd: Brak pliku functions.sh w tym samym katalogu!"
-    echo "Pobierz oba pliki: menu.sh i functions.sh"
+    echo "Uruchom install.sh aby pobrać wszystkie pliki"
     exit 1
 fi
 
