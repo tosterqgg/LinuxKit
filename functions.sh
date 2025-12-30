@@ -85,21 +85,8 @@ select_package_manager() {
                     local mouse_seq="<"
                     while IFS= read -rsn1 -t 0.01 char; do mouse_seq+="$char"; [[ $char == 'M' || $char == 'm' ]] && break; done
                     if [[ "$mouse_seq" =~ \<([0-9]+)\;([0-9]+)\;([0-9]+)M ]]; then
-                        local y="${BASH_REMATCH[3]}"
-                        local clicked=$((y - 5))
-                        if [ $clicked -ge 0 ] && [ $clicked -le $max_options ]; then 
-                            case $clicked in
-                                0) PKG_MANAGER="pacman"; PKG_MANAGER_NAME="Pacman (Arch)"; return ;;
-                                1) PKG_MANAGER="apt"; PKG_MANAGER_NAME="APT (Debian/Ubuntu)"; return ;;
-                                2) PKG_MANAGER="dnf"; PKG_MANAGER_NAME="DNF (Fedora)"; return ;;
-                                3) PKG_MANAGER="yum"; PKG_MANAGER_NAME="YUM (CentOS/RHEL)"; return ;;
-                                4) PKG_MANAGER="zypper"; PKG_MANAGER_NAME="Zypper (openSUSE)"; return ;;
-                                5) PKG_MANAGER="emerge"; PKG_MANAGER_NAME="Emerge (Gentoo)"; return ;;
-                                6) PKG_MANAGER="apk"; PKG_MANAGER_NAME="APK (Alpine)"; return ;;
-                                7) PKG_MANAGER="winget"; PKG_MANAGER_NAME="Winget (Windows)"; return ;;
-                                8) autodetect_package_manager; return ;;
-                            esac
-                        fi
+                        local y="${BASH_REMATCH[3]}" clicked=$((y - 5))
+                        if [ $clicked -ge 0 ] && [ $clicked -le $max_options ]; then selected=$clicked; fi
                     fi
                 fi
             fi
@@ -194,7 +181,6 @@ custom_command() {
     echo ""; [ $e -eq 0 ] && success "Wykonano" || error $e "Błąd"
     echo ""; read -p "Enter..."
 }
-
 update_system() {
     local sel=0 max=1
     printf '\033[?1000h\033[?1002h\033[?1006h'
@@ -214,29 +200,8 @@ update_system() {
                     local mouse_seq="<"
                     while IFS= read -rsn1 -t 0.01 char; do mouse_seq+="$char"; [[ $char == 'M' || $char == 'm' ]] && break; done
                     if [[ "$mouse_seq" =~ \<([0-9]+)\;([0-9]+)\;([0-9]+)M ]]; then
-                        local y="${BASH_REMATCH[3]}"
-                        local clicked=$((y - 5))
-                        if [ $clicked -ge 0 ] && [ $clicked -le $max ]; then
-                            clear
-                            if [ $clicked -eq 0 ]; then
-                                echo "╔════════════════════════════════════╗"; echo "║     AKTUALIZACJA CAŁEGO SYSTEMU    ║"; echo "╚════════════════════════════════════╝"; echo ""
-                                info "Aktualizuję..."
-                                case $PKG_MANAGER in
-                                    pacman) sudo pacman -Syu --noconfirm ;;
-                                    apt) sudo apt update && sudo apt upgrade -y ;;
-                                    dnf) sudo dnf upgrade -y ;;
-                                    yum) sudo yum update -y ;;
-                                    zypper) sudo zypper update -y ;;
-                                    emerge) sudo emerge --update --deep --newuse @world ;;
-                                    apk) sudo apk upgrade ;;
-                                    winget) winget upgrade --all ;;
-                                esac
-                                local e=$?; echo ""; [ $e -eq 0 ] || [ $e -eq 100 ] && success "Zaktualizowano!" || error $e "Błąd"
-                                echo ""; read -p "Enter..."
-                            else
-                                update_specific_package
-                            fi
-                        fi
+                        local y="${BASH_REMATCH[3]}" clicked=$((y - 5))
+                        [ $clicked -ge 0 ] && [ $clicked -le $max ] && sel=$clicked
                     fi
                 fi
             fi
@@ -347,27 +312,30 @@ install_de() {
                     local mouse_seq="<"
                     while IFS= read -rsn1 -t 0.01 char; do mouse_seq+="$char"; [[ $char == 'M' || $char == 'm' ]] && break; done
                     if [[ "$mouse_seq" =~ \<([0-9]+)\;([0-9]+)\;([0-9]+)M ]]; then
-                        local y="${BASH_REMATCH[3]}"
-                        local clicked=$((y - 5))
-                        if [ $clicked -ge 0 ] && [ $clicked -le $max ]; then
-                            clear
-                            case $clicked in
-                                0) echo "═══ KDE PLASMA ═══"; echo ""; info "Instaluję..."
-                                   case $PKG_MANAGER in
-                                       pacman) sudo pacman -S --noconfirm plasma kde-applications sddm; sudo systemctl enable sddm ;;
-                                       apt) sudo apt install -y kde-plasma-desktop sddm; sudo systemctl enable sddm ;;
-                                       dnf) sudo dnf install -y @kde-desktop-environment sddm; sudo systemctl enable sddm ;;
-                                       *) error 1 "Nie wspierane" ;; esac
-                                   [ $? -eq 0 ] && success "Zainstalowano!" || error $? "Błąd"; echo ""; read -p "Enter..." ;;
-                                1) echo "═══ GNOME ═══"; echo ""; info "Instaluję..."
-                                   case $PKG_MANAGER in
-                                       pacman) sudo pacman -S --noconfirm gnome gnome-extra gdm; sudo systemctl enable gdm ;;
-                                       apt) sudo apt install -y gnome gdm3; sudo systemctl enable gdm3 ;;
-                                       dnf) sudo dnf install -y @gnome-desktop gdm; sudo systemctl enable gdm ;;
-                                       *) error 1 "Nie wspierane" ;; esac
-                                   [ $? -eq 0 ] && success "Zainstalowano!" || error $? "Błąd"; echo ""; read -p "Enter..." ;;
-                                2) echo "═══ XFCE ═══"; echo ""; info "Instaluję..."
-                                   case $PKG_MANAGER in
-                                       pacman) sudo pacman -S --noconfirm xfce4 xfce4-goodies lightdm lightdm-gtk-greeter; sudo systemctl enable lightdm ;;
-                                       apt) sudo apt install -y xfce4 xfce4-goodies lightdm; sudo systemctl enable lightdm ;;
-                                       dnf)
+                        local y="${BASH_REMATCH[3]}" clicked=$((y - 5))
+                        [ $clicked -ge 0 ] && [ $clicked -le $max ] && sel=$clicked
+                    fi
+                fi
+            fi
+        elif [[ $key == "q" ]] || [[ $key == "Q" ]]; then return
+        elif [[ $key == "" ]]; then
+            clear
+            case $sel in
+                0) echo "═══ KDE PLASMA ═══"; echo ""; info "Instaluję..."
+                   case $PKG_MANAGER in
+                       pacman) sudo pacman -S --noconfirm plasma kde-applications sddm; sudo systemctl enable sddm ;;
+                       apt) sudo apt install -y kde-plasma-desktop sddm; sudo systemctl enable sddm ;;
+                       dnf) sudo dnf install -y @kde-desktop-environment sddm; sudo systemctl enable sddm ;;
+                       *) error 1 "Nie wspierane" ;; esac
+                   [ $? -eq 0 ] && success "Zainstalowano!" || error $? "Błąd" ;;
+                1) echo "═══ GNOME ═══"; echo ""; info "Instaluję..."
+                   case $PKG_MANAGER in
+                       pacman) sudo pacman -S --noconfirm gnome gnome-extra gdm; sudo systemctl enable gdm ;;
+                       apt) sudo apt install -y gnome gdm3; sudo systemctl enable gdm3 ;;
+                       dnf) sudo dnf install -y @gnome-desktop gdm; sudo systemctl enable gdm ;;
+                       *) error 1 "Nie wspierane" ;; esac
+                   [ $? -eq 0 ] && success "Zainstalowano!" || error $? "Błąd" ;;
+                2) echo "═══ XFCE ═══"; echo ""; info "Instaluję..."
+                   case $PKG_MANAGER in
+                       pacman) sudo pacman -S --noconfirm xfce4 xfce4-goodies lightdm lightdm-gtk-greeter; sudo systemctl enable lightdm ;;
+                       apt) sudo apt install -y xfce4 xfce4-goodies lightdm; sudo
