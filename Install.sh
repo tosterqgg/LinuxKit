@@ -222,28 +222,43 @@ do_install() {
         return 1
     fi
     
-    # Utwórz wrapper script
+    # Utwórz wrapper script który działa poprawnie
     info "Tworzenie skryptu uruchamiającego..."
-    cat > "$INSTALL_DIR/ui-manager" << 'EOF'
+    cat > "$INSTALL_DIR/ui-manager" << 'EOFWRAPPER'
 #!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+# Znajdź prawdziwą lokalizację skryptu (obsługa symlinków)
+if [ -L "$0" ]; then
+    SCRIPT_PATH="$(readlink -f "$0")"
+else
+    SCRIPT_PATH="$0"
+fi
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
-exec bash ./ui.sh "$@"
-EOF
+
+# Uruchom ui.sh
+exec bash "$SCRIPT_DIR/ui.sh" "$@"
+EOFWRAPPER
     chmod +x "$INSTALL_DIR/ui-manager"
     
-    # Utwórz symlink
+    # Utwórz symlink systemowy
     info "Tworzenie linku systemowego..."
+    
+    # Usuń stary link jeśli istnieje
+    [ -L "$SYMLINK_PATH" ] && { [ -w "$(dirname "$SYMLINK_PATH")" ] && rm -f "$SYMLINK_PATH" || sudo rm -f "$SYMLINK_PATH"; }
+    
+    # Utwórz nowy link
     if [ -w "$(dirname "$SYMLINK_PATH")" ]; then
         ln -sf "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH" 2>/dev/null
     else
         sudo ln -sf "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH" 2>/dev/null
     fi
     
-    if [ -L "$SYMLINK_PATH" ]; then
-        success "Link utworzony: $SYMLINK_PATH"
+    # Sprawdź czy link działa
+    if [ -L "$SYMLINK_PATH" ] && [ -x "$SYMLINK_PATH" ]; then
+        success "Link utworzony i działa: $SYMLINK_PATH"
     else
-        warning "Nie udało się utworzyć linku (nie krytyczne)"
+        warning "Link nie został utworzony (nie krytyczne)"
+        warning "Użyj: $INSTALL_DIR/ui-manager"
     fi
     
     echo ""
