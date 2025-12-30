@@ -59,39 +59,11 @@ check_dependencies() {
     show_progress 100 "Gotowe!"; sleep 1
 }
 
-# Funkcja do obsługi myszy/dotyku
-handle_mouse_input() {
-    local menu_start_line=$1
-    local max_options=$2
-    local mouse_seq="<"
-    while IFS= read -rsn1 -t 0.01 char; do
-        mouse_seq+="$char"
-        [[ $char == 'M' || $char == 'm' ]] && break
-    done
-    if [[ "$mouse_seq" =~ \<([0-9]+)\;([0-9]+)\;([0-9]+)[Mm] ]]; then
-        local button="${BASH_REMATCH[1]}"
-        local y="${BASH_REMATCH[3]}"
-        # Obsługa tylko kliknięcia (button 0 = lewy przycisk myszy)
-        if [[ "$button" == "0" ]]; then
-            local clicked=$((y - menu_start_line))
-            if [ $clicked -ge 0 ] && [ $clicked -le $max_options ]; then
-                echo "$clicked"
-                return 0
-            fi
-        fi
-    fi
-    echo "-1"
-}
-
 select_package_manager() {
     local selected=0 max_options=8
     printf '\033[?1000h\033[?1002h\033[?1006h'
     while true; do
-        clear
-        echo "╔════════════════════════════════════╗"
-        echo "║   WYBIERZ MENEDŻER PAKIETÓW        ║"
-        echo "╚════════════════════════════════════╝"
-        echo ""
+        clear; echo "╔════════════════════════════════════╗"; echo "║   WYBIERZ MENEDŻER PAKIETÓW        ║"; echo "╚════════════════════════════════════╝"; echo ""
         [ $selected -eq 0 ] && echo -e "${GREEN}> [pacman (Arch)]${NC}" || echo "  [pacman (Arch)]"
         [ $selected -eq 1 ] && echo -e "${GREEN}> [apt (Debian/Ubuntu)]${NC}" || echo "  [apt (Debian/Ubuntu)]"
         [ $selected -eq 2 ] && echo -e "${GREEN}> [dnf (Fedora)]${NC}" || echo "  [dnf (Fedora)]"
@@ -101,26 +73,34 @@ select_package_manager() {
         [ $selected -eq 6 ] && echo -e "${GREEN}> [apk (Alpine)]${NC}" || echo "  [apk (Alpine)]"
         [ $selected -eq 7 ] && echo -e "${GREEN}> [winget (Windows)]${NC}" || echo "  [winget (Windows)]"
         [ $selected -eq 8 ] && echo -e "${GREEN}> [Autowykryj]${NC}" || echo "  [Autowykryj]"
-        echo ""
-        echo "Strzałki ↑↓ lub dotknij, Enter"
-        
+        echo ""; echo "Strzałki ↑↓ lub dotknij, Enter"
         IFS= read -rsn1 key
         if [[ $key == $'\x1b' ]]; then
             IFS= read -rsn1 -t 0.01 key2
             if [[ $key2 == '[' ]]; then
                 IFS= read -rsn1 -t 0.01 key3
-                if [[ $key3 == 'A' ]]; then
-                    ((selected--))
-                    [ $selected -lt 0 ] && selected=$max_options
-                elif [[ $key3 == 'B' ]]; then
-                    ((selected++))
-                    [ $selected -gt $max_options ] && selected=0
+                if [[ $key3 == 'A' ]]; then ((selected--)); [ $selected -lt 0 ] && selected=$max_options
+                elif [[ $key3 == 'B' ]]; then ((selected++)); [ $selected -gt $max_options ] && selected=0
                 elif [[ $key3 == '<' ]]; then
-                    local result=$(handle_mouse_input 4 $max_options)
-                    [ "$result" != "-1" ] && selected=$result
+                    local mouse_seq=""
+                    while IFS= read -rsn1 -t 0.01 char; do 
+                        mouse_seq+="$char"
+                        [[ $char == 'M' || $char == 'm' ]] && break
+                    done
+                    if [[ "$mouse_seq" =~ ^([0-9]+)\;([0-9]+)\;([0-9]+)[Mm]$ ]]; then
+                        local button="${BASH_REMATCH[1]}"
+                        local y="${BASH_REMATCH[3]}"
+                        if [[ "$button" == "0" ]]; then
+                            local clicked=$((y - 5))
+                            if [ $clicked -ge 0 ] && [ $clicked -le $max_options ]; then 
+                                selected=$clicked
+                            fi
+                        fi
+                    fi
                 fi
             fi
-        elif [[ $key == "" ]]; then
+        fi
+        [[ $key == "" ]] && {
             case $selected in
                 0) PKG_MANAGER="pacman"; PKG_MANAGER_NAME="Pacman (Arch)"; return ;;
                 1) PKG_MANAGER="apt"; PKG_MANAGER_NAME="APT (Debian/Ubuntu)"; return ;;
@@ -132,7 +112,7 @@ select_package_manager() {
                 7) PKG_MANAGER="winget"; PKG_MANAGER_NAME="Winget (Windows)"; return ;;
                 8) autodetect_package_manager; return ;;
             esac
-        fi
+        }
     done
 }
 
@@ -150,15 +130,9 @@ autodetect_package_manager() {
 }
 
 show_menu() {
-    local selected=$1
-    clear
-    printf '\033[?1000h\033[?1002h\033[?1006h'
-    echo "╔════════════════════════════════════╗"
-    echo "║     MENEDŻER PAKIETÓW              ║"
-    echo "╚════════════════════════════════════╝"
-    echo ""
-    info "Używasz: $PKG_MANAGER_NAME"
-    echo ""
+    local selected=$1; clear; printf '\033[?1000h\033[?1002h\033[?1006h'
+    echo "╔════════════════════════════════════╗"; echo "║     MENEDŻER PAKIETÓW              ║"; echo "╚════════════════════════════════════╝"; echo ""
+    info "Używasz: $PKG_MANAGER_NAME"; echo ""
     [ $selected -eq 0 ] && echo -e "${GREEN}> [Install]${NC}" || echo "  [Install]"
     [ $selected -eq 1 ] && echo -e "${GREEN}> [Uninstall]${NC}" || echo "  [Uninstall]"
     [ $selected -eq 2 ] && echo -e "${GREEN}> [Update]${NC}" || echo "  [Update]"
@@ -167,16 +141,11 @@ show_menu() {
     [ $selected -eq 5 ] && echo -e "${GREEN}> [Pomocne komendy]${NC}" || echo "  [Pomocne komendy]"
     [ $selected -eq 6 ] && echo -e "${GREEN}> [Zmień menedżer]${NC}" || echo "  [Zmień menedżer]"
     [ $selected -eq 7 ] && echo -e "${GREEN}> [Exit]${NC}" || echo "  [Exit]"
-    echo ""
-    echo "Strzałki ↑↓ lub dotknij, Enter"
+    echo ""; echo "Strzałki ↑↓ lub dotknij, Enter"
 }
 
 install_package() {
-    clear
-    echo "╔════════════════════════════════════╗"
-    echo "║         INSTALACJA PAKIETU         ║"
-    echo "╚════════════════════════════════════╝"
-    echo ""
+    clear; echo "╔════════════════════════════════════╗"; echo "║         INSTALACJA PAKIETU         ║"; echo "╚════════════════════════════════════╝"; echo ""
     read -p "Nazwa: " package
     [ -z "$package" ] && { error 1 "Brak nazwy"; echo ""; read -p "Enter..."; return 1; }
     info "Instaluję: $package"
@@ -190,19 +159,12 @@ install_package() {
         apk) sudo apk add "$package" ;;
         winget) winget install "$package" --accept-source-agreements --accept-package-agreements ;;
     esac
-    local e=$?
-    echo ""
-    [ $e -eq 0 ] && success "Zainstalowano" || error $e "Błąd"
-    echo ""
-    read -p "Enter..."
+    local e=$?; echo ""; [ $e -eq 0 ] && success "Zainstalowano" || error $e "Błąd"
+    echo ""; read -p "Enter..."
 }
 
 uninstall_package() {
-    clear
-    echo "╔════════════════════════════════════╗"
-    echo "║        DEINSTALACJA PAKIETU        ║"
-    echo "╚════════════════════════════════════╝"
-    echo ""
+    clear; echo "╔════════════════════════════════════╗"; echo "║        DEINSTALACJA PAKIETU        ║"; echo "╚════════════════════════════════════╝"; echo ""
     read -p "Nazwa: " package
     [ -z "$package" ] && { error 1 "Brak nazwy"; echo ""; read -p "Enter..."; return 1; }
     info "Usuwam: $package"
@@ -216,70 +178,55 @@ uninstall_package() {
         apk) sudo apk del "$package" ;;
         winget) winget uninstall "$package" ;;
     esac
-    local e=$?
-    echo ""
-    [ $e -eq 0 ] && success "Usunięto" || error $e "Błąd"
-    echo ""
-    read -p "Enter..."
+    local e=$?; echo ""; [ $e -eq 0 ] && success "Usunięto" || error $e "Błąd"
+    echo ""; read -p "Enter..."
 }
 
 custom_command() {
-    clear
-    echo "╔════════════════════════════════════╗"
-    echo "║        WŁASNA KOMENDA              ║"
-    echo "╚════════════════════════════════════╝"
-    echo ""
+    clear; echo "╔════════════════════════════════════╗"; echo "║        WŁASNA KOMENDA              ║"; echo "╚════════════════════════════════════╝"; echo ""
     read -p "Komenda: " command
     [ -z "$command" ] && { error 1 "Brak komendy"; echo ""; read -p "Enter..."; return 1; }
-    info "Wykonuję: $command"
-    echo ""
-    eval "$command"
-    local e=$?
-    echo ""
-    [ $e -eq 0 ] && success "Wykonano" || error $e "Błąd"
-    echo ""
-    read -p "Enter..."
+    info "Wykonuję: $command"; echo ""; eval "$command"; local e=$?
+    echo ""; [ $e -eq 0 ] && success "Wykonano" || error $e "Błąd"
+    echo ""; read -p "Enter..."
 }
 
 update_system() {
     local sel=0 max=1
     printf '\033[?1000h\033[?1002h\033[?1006h'
     while true; do
-        clear
-        echo "╔════════════════════════════════════╗"
-        echo "║       AKTUALIZACJA SYSTEMU         ║"
-        echo "╚════════════════════════════════════╝"
-        echo ""
+        clear; echo "╔════════════════════════════════════╗"; echo "║       AKTUALIZACJA SYSTEMU         ║"; echo "╚════════════════════════════════════╝"; echo ""
         [ $sel -eq 0 ] && echo -e "${GREEN}> [Cały system]${NC}" || echo "  [Cały system]"
         [ $sel -eq 1 ] && echo -e "${GREEN}> [Wybrany pakiet]${NC}" || echo "  [Wybrany pakiet]"
-        echo ""
-        echo "↑↓ lub dotknij, Enter, q=wyjście"
-        
+        echo ""; echo "↑↓ lub dotknij, Enter, q=wyjście"
         IFS= read -rsn1 key
         if [[ $key == $'\x1b' ]]; then
             IFS= read -rsn1 -t 0.01 key2
             if [[ $key2 == '[' ]]; then
                 IFS= read -rsn1 -t 0.01 key3
-                if [[ $key3 == 'A' ]]; then
-                    ((sel--))
-                    [ $sel -lt 0 ] && sel=$max
-                elif [[ $key3 == 'B' ]]; then
-                    ((sel++))
-                    [ $sel -gt $max ] && sel=0
+                if [[ $key3 == 'A' ]]; then ((sel--)); [ $sel -lt 0 ] && sel=$max
+                elif [[ $key3 == 'B' ]]; then ((sel++)); [ $sel -gt $max ] && sel=0
                 elif [[ $key3 == '<' ]]; then
-                    local result=$(handle_mouse_input 4 $max)
-                    [ "$result" != "-1" ] && sel=$result
+                    local mouse_seq=""
+                    while IFS= read -rsn1 -t 0.01 char; do 
+                        mouse_seq+="$char"
+                        [[ $char == 'M' || $char == 'm' ]] && break
+                    done
+                    if [[ "$mouse_seq" =~ ^([0-9]+)\;([0-9]+)\;([0-9]+)[Mm]$ ]]; then
+                        local button="${BASH_REMATCH[1]}"
+                        local y="${BASH_REMATCH[3]}"
+                        if [[ "$button" == "0" ]]; then
+                            local clicked=$((y - 5))
+                            [ $clicked -ge 0 ] && [ $clicked -le $max ] && sel=$clicked
+                        fi
+                    fi
                 fi
             fi
-        elif [[ $key == "q" ]] || [[ $key == "Q" ]]; then
-            return
+        elif [[ $key == "q" ]] || [[ $key == "Q" ]]; then return
         elif [[ $key == "" ]]; then
             clear
             if [ $sel -eq 0 ]; then
-                echo "╔════════════════════════════════════╗"
-                echo "║     AKTUALIZACJA CAŁEGO SYSTEMU    ║"
-                echo "╚════════════════════════════════════╝"
-                echo ""
+                echo "╔════════════════════════════════════╗"; echo "║     AKTUALIZACJA CAŁEGO SYSTEMU    ║"; echo "╚════════════════════════════════════╝"; echo ""
                 info "Aktualizuję..."
                 case $PKG_MANAGER in
                     pacman) sudo pacman -Syu --noconfirm ;;
@@ -291,11 +238,8 @@ update_system() {
                     apk) sudo apk upgrade ;;
                     winget) winget upgrade --all ;;
                 esac
-                local e=$?
-                echo ""
-                [ $e -eq 0 ] || [ $e -eq 100 ] && success "Zaktualizowano!" || error $e "Błąd"
-                echo ""
-                read -p "Enter..."
+                local e=$?; echo ""; [ $e -eq 0 ] || [ $e -eq 100 ] && success "Zaktualizowano!" || error $e "Błąd"
+                echo ""; read -p "Enter..."
             else
                 update_specific_package
             fi
@@ -314,82 +258,41 @@ update_specific_package() {
         *) all_packages=() ;;
     esac
     while true; do
-        clear
-        echo "╔════════════════════════════════════╗"
-        echo "║   AKTUALIZACJA WYBRANEGO PAKIETU   ║"
-        echo "╚════════════════════════════════════╝"
-        echo ""
-        if [ -z "$search_term" ]; then
-            packages=("${all_packages[@]}")
-        else
-            packages=()
-            for pkg in "${all_packages[@]}"; do
-                [[ "$pkg" == *"$search_term"* ]] && packages+=("$pkg")
-            done
-        fi
+        clear; echo "╔════════════════════════════════════╗"; echo "║   AKTUALIZACJA WYBRANEGO PAKIETU   ║"; echo "╚════════════════════════════════════╝"; echo ""
+        if [ -z "$search_term" ]; then packages=("${all_packages[@]}")
+        else packages=(); for pkg in "${all_packages[@]}"; do [[ "$pkg" == *"$search_term"* ]] && packages+=("$pkg"); done; fi
         if [ ${#packages[@]} -eq 0 ]; then
-            info "Brak aktualizacji"
-            [ -n "$search_term" ] && info "dla: '$search_term'"
-            echo ""
-            echo "════════════════════════════════════"
-            echo "Wyszukaj: ${search_term}█"
-            echo "════════════════════════════════════"
-            echo ""
-            echo "ESC=wyjście, Backspace=wyczyść"
+            info "Brak aktualizacji"; [ -n "$search_term" ] && info "dla: '$search_term'"
+            echo ""; echo "════════════════════════════════════"; echo "Wyszukaj: ${search_term}█"; echo "════════════════════════════════════"
+            echo ""; echo "ESC=wyjście, Backspace=wyczyść"
             IFS= read -rsn1 key
-            if [[ $key == $'\x1b' ]]; then
-                read -rsn2 -t 0.1 key2
-                [ "$key2" == "" ] && return
-            elif [[ $key == $'\x7f' ]]; then
-                search_term="${search_term%?}"
-            elif [[ $key =~ [a-zA-Z0-9\-] ]]; then
-                search_term="${search_term}${key}"
-                selected=0
-                scroll_offset=0
-            fi
+            if [[ $key == $'\x1b' ]]; then read -rsn2 -t 0.1 key2; [ "$key2" == "" ] && return
+            elif [[ $key == $'\x7f' ]]; then search_term="${search_term%?}"
+            elif [[ $key =~ [a-zA-Z0-9\-] ]]; then search_term="${search_term}${key}"; selected=0; scroll_offset=0; fi
             continue
         fi
         local total=${#packages[@]}
-        [ $selected -ge $total ] && selected=$((total - 1))
-        [ $selected -lt 0 ] && selected=0
+        [ $selected -ge $total ] && selected=$((total - 1)); [ $selected -lt 0 ] && selected=0
         [ $selected -lt $scroll_offset ] && scroll_offset=$selected
         [ $selected -ge $((scroll_offset + max_display)) ] && scroll_offset=$((selected - max_display + 1))
         [ $scroll_offset -lt 0 ] && scroll_offset=0
-        local end=$((scroll_offset + max_display))
-        [ $end -gt $total ] && end=$total
-        info "Dostępne: $total"
-        echo ""
+        local end=$((scroll_offset + max_display)); [ $end -gt $total ] && end=$total
+        info "Dostępne: $total"; echo ""
         for ((i=scroll_offset; i<end; i++)); do
             [ $i -eq $selected ] && echo -e "${GREEN}> ${packages[$i]}${NC}" || echo "  ${packages[$i]}"
         done
-        [ $total -gt $max_display ] && {
-            echo ""
-            info "Pozycja: $((selected + 1))/$total"
-        }
-        echo ""
-        echo "════════════════════════════════════"
-        echo "Wyszukaj: ${search_term}█"
-        echo "════════════════════════════════════"
-        echo ""
-        echo "↑↓, Enter, ESC, Backspace"
-        
+        [ $total -gt $max_display ] && { echo ""; info "Pozycja: $((selected + 1))/$total"; }
+        echo ""; echo "════════════════════════════════════"; echo "Wyszukaj: ${search_term}█"; echo "════════════════════════════════════"
+        echo ""; echo "↑↓, Enter, ESC, Backspace"
         IFS= read -rsn1 key
-        if [[ $key == $'\x1b' ]]; then
-            read -rsn2 -t 0.1 key
-            case "$key" in
-                '[A') ((selected--)); [ $selected -lt 0 ] && selected=$((total - 1)) ;;
-                '[B') ((selected++)); [ $selected -ge $total ] && selected=0 ;;
-                '') return ;;
-            esac
+        if [[ $key == $'\x1b' ]]; then read -rsn2 -t 0.1 key
+            case "$key" in '[A') ((selected--)); [ $selected -lt 0 ] && selected=$((total - 1)) ;;
+                           '[B') ((selected++)); [ $selected -ge $total ] && selected=0 ;;
+                           '') return ;; esac
         elif [[ $key == "" ]]; then
-            clear
-            local pkg="${packages[$selected]}"
-            echo "╔════════════════════════════════════╗"
-            echo "║      AKTUALIZACJA PAKIETU          ║"
-            echo "╚════════════════════════════════════╝"
-            echo ""
-            info "Aktualizuję: $pkg"
-            echo ""
+            clear; local pkg="${packages[$selected]}"
+            echo "╔════════════════════════════════════╗"; echo "║      AKTUALIZACJA PAKIETU          ║"; echo "╚════════════════════════════════════╝"; echo ""
+            info "Aktualizuję: $pkg"; echo ""
             case $PKG_MANAGER in
                 pacman) sudo pacman -S "$pkg" --noconfirm ;;
                 apt) sudo apt install --only-upgrade "$pkg" -y ;;
@@ -399,21 +302,10 @@ update_specific_package() {
                 winget) winget upgrade "$pkg" ;;
                 *) error 1 "Nie wspierane" ;;
             esac
-            local e=$?
-            echo ""
-            [ $e -eq 0 ] && success "Zaktualizowano '$pkg'" || error $e "Błąd"
-            echo ""
-            read -p "Enter..."
-            return
-        elif [[ $key == $'\x7f' ]]; then
-            search_term="${search_term%?}"
-            selected=0
-            scroll_offset=0
-        elif [[ $key =~ [a-zA-Z0-9\-] ]]; then
-            search_term="${search_term}${key}"
-            selected=0
-            scroll_offset=0
-        fi
+            local e=$?; echo ""; [ $e -eq 0 ] && success "Zaktualizowano '$pkg'" || error $e "Błąd"
+            echo ""; read -p "Enter..."; return
+        elif [[ $key == $'\x7f' ]]; then search_term="${search_term%?}"; selected=0; scroll_offset=0
+        elif [[ $key =~ [a-zA-Z0-9\-] ]]; then search_term="${search_term}${key}"; selected=0; scroll_offset=0; fi
     done
 }
 
@@ -421,44 +313,73 @@ install_de() {
     local sel=0 max=2
     printf '\033[?1000h\033[?1002h\033[?1006h'
     while true; do
-        clear
-        echo "╔════════════════════════════════════╗"
-        echo "║    INSTALACJA ŚRODOWISKA DESKTOP   ║"
-        echo "╚════════════════════════════════════╝"
-        echo ""
+        clear; echo "╔════════════════════════════════════╗"; echo "║    INSTALACJA ŚRODOWISKA DESKTOP   ║"; echo "╚════════════════════════════════════╝"; echo ""
         [ $sel -eq 0 ] && echo -e "${GREEN}> [KDE Plasma]${NC}" || echo "  [KDE Plasma]"
         [ $sel -eq 1 ] && echo -e "${GREEN}> [GNOME]${NC}" || echo "  [GNOME]"
         [ $sel -eq 2 ] && echo -e "${GREEN}> [XFCE]${NC}" || echo "  [XFCE]"
-        echo ""
-        echo "↑↓ lub dotknij, Enter, q=wyjście"
-        
+        echo ""; echo "↑↓ lub dotknij, Enter, q=wyjście"
         IFS= read -rsn1 key
         if [[ $key == $'\x1b' ]]; then
             IFS= read -rsn1 -t 0.01 key2
             if [[ $key2 == '[' ]]; then
                 IFS= read -rsn1 -t 0.01 key3
-                if [[ $key3 == 'A' ]]; then
-                    ((sel--))
-                    [ $sel -lt 0 ] && sel=$max
-                elif [[ $key3 == 'B' ]]; then
-                    ((sel++))
-                    [ $sel -gt $max ] && sel=0
+                if [[ $key3 == 'A' ]]; then ((sel--)); [ $sel -lt 0 ] && sel=$max
+                elif [[ $key3 == 'B' ]]; then ((sel++)); [ $sel -gt $max ] && sel=0
                 elif [[ $key3 == '<' ]]; then
-                    local result=$(handle_mouse_input 4 $max)
-                    [ "$result" != "-1" ] && sel=$result
+                    local mouse_seq=""
+                    while IFS= read -rsn1 -t 0.01 char; do 
+                        mouse_seq+="$char"
+                        [[ $char == 'M' || $char == 'm' ]] && break
+                    done
+                    if [[ "$mouse_seq" =~ ^([0-9]+)\;([0-9]+)\;([0-9]+)[Mm]$ ]]; then
+                        local button="${BASH_REMATCH[1]}"
+                        local y="${BASH_REMATCH[3]}"
+                        if [[ "$button" == "0" ]]; then
+                            local clicked=$((y - 5))
+                            [ $clicked -ge 0 ] && [ $clicked -le $max ] && sel=$clicked
+                        fi
+                    fi
                 fi
             fi
-        elif [[ $key == "q" ]] || [[ $key == "Q" ]]; then
-            return
+        elif [[ $key == "q" ]] || [[ $key == "Q" ]]; then return
         elif [[ $key == "" ]]; then
             clear
             case $sel in
-                0)
-                    echo "═══ KDE PLASMA ═══"
-                    echo ""
-                    info "Instaluję..."
-                    case $PKG_MANAGER in
-                        pacman) sudo pacman -S --noconfirm plasma kde-applications sddm; sudo systemctl enable sddm ;;
-                        apt) sudo apt install -y kde-plasma-desktop sddm; sudo systemctl enable sddm ;;
-                        dnf) sudo dnf install -y @kde-desktop-environment sddm; sudo systemctl enable sddm ;;
-                        *) error 1 "Nie wspi
+                0) echo "═══ KDE PLASMA ═══"; echo ""; info "Instaluję..."
+                   case $PKG_MANAGER in
+                       pacman) sudo pacman -S --noconfirm plasma kde-applications sddm; sudo systemctl enable sddm ;;
+                       apt) sudo apt install -y kde-plasma-desktop sddm; sudo systemctl enable sddm ;;
+                       dnf) sudo dnf install -y @kde-desktop-environment sddm; sudo systemctl enable sddm ;;
+                       *) error 1 "Nie wspierane" ;; esac
+                   [ $? -eq 0 ] && success "Zainstalowano!" || error $? "Błąd" ;;
+                1) echo "═══ GNOME ═══"; echo ""; info "Instaluję..."
+                   case $PKG_MANAGER in
+                       pacman) sudo pacman -S --noconfirm gnome gnome-extra gdm; sudo systemctl enable gdm ;;
+                       apt) sudo apt install -y gnome gdm3; sudo systemctl enable gdm3 ;;
+                       dnf) sudo dnf install -y @gnome-desktop gdm; sudo systemctl enable gdm ;;
+                       *) error 1 "Nie wspierane" ;; esac
+                   [ $? -eq 0 ] && success "Zainstalowano!" || error $? "Błąd" ;;
+                2) echo "═══ XFCE ═══"; echo ""; info "Instaluję..."
+                   case $PKG_MANAGER in
+                       pacman) sudo pacman -S --noconfirm xfce4 xfce4-goodies lightdm lightdm-gtk-greeter; sudo systemctl enable lightdm ;;
+                       apt) sudo apt install -y xfce4 xfce4-goodies lightdm; sudo systemctl enable lightdm ;;
+                       dnf) sudo dnf install -y @xfce-desktop-environment lightdm; sudo systemctl enable lightdm ;;
+                       *) error 1 "Nie wspierane" ;; esac
+                   [ $? -eq 0 ] && success "Zainstalowano!" || error $? "Błąd" ;;
+            esac
+            echo ""; read -p "Enter..."
+        fi
+    done
+}
+
+helpful_commands() {
+    local sel=0 max=12
+    printf '\033[?1000h\033[?1002h\033[?1006h'
+    while true; do
+        clear; echo "╔════════════════════════════════════╗"; echo "║        POMOCNE KOMENDY             ║"; echo "╚════════════════════════════════════╝"; echo ""
+        [ $sel -eq 0 ] && echo -e "${GREEN}> [Wyczyść cache]${NC}" || echo "  [Wyczyść cache]"
+        [ $sel -eq 1 ] && echo -e "${GREEN}> [Usuń nieużywane]${NC}" || echo "  [Usuń nieużywane]"
+        [ $sel -eq 2 ] && echo -e "${GREEN}> [Lista pakietów]${NC}" || echo "  [Lista pakietów]"
+        [ $sel -eq 3 ] && echo -e "${GREEN}> [Wyszukaj]${NC}" || echo "  [Wyszukaj]"
+        [ $sel -eq 4 ] && echo -e "${GREEN}> [Info o pakiecie]${NC}" || echo "  [Info o pakiecie]"
+        [ $sel -eq 5 ] && echo -e "${GREEN}> [Naprawa systemu]${NC}" || echo "  [Naprawa systemu]"
