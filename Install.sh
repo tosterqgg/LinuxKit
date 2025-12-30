@@ -165,12 +165,21 @@ create_symlink() {
     
     info "Tworzenie linku systemowego..."
     
-    # Usuń stary link jeśli istnieje
-    if [ -L "$link" ] || [ -e "$link" ]; then
+    # Usuń wszystkie stare wersje linku (również uszkodzone symlinki)
+    if [ -L "$link" ]; then
+        # To jest symlink (może być uszkodzony)
         if sudo rm -f "$link" 2>/dev/null; then
-            info "Usunięto stary link"
+            info "Usunięto stary symlink"
         else
-            warning "Nie można usunąć starego linku"
+            warning "Nie można usunąć starego symlinku"
+            return 1
+        fi
+    elif [ -e "$link" ]; then
+        # To jest zwykły plik/katalog
+        if sudo rm -rf "$link" 2>/dev/null; then
+            info "Usunięto stary plik"
+        else
+            warning "Nie można usunąć starego pliku"
             return 1
         fi
     fi
@@ -214,6 +223,17 @@ do_install() {
     echo -e "${BLUE}║          INSTALACJA                ║${NC}"
     echo -e "${BLUE}╚════════════════════════════════════╝${NC}"
     echo ""
+    
+    # Usuń stary symlink przed rozpoczęciem instalacji
+    if [ -L "$SYMLINK_PATH" ] || [ -e "$SYMLINK_PATH" ]; then
+        info "Usuwanie starego symlinku..."
+        if sudo rm -f "$SYMLINK_PATH" 2>/dev/null; then
+            success "Stary symlink usunięty"
+        else
+            warning "Nie można usunąć starego symlinku (kontynuuję instalację)"
+        fi
+        echo ""
+    fi
     
     check_git || { read -p "Enter..."; return 1; }
     
@@ -398,6 +418,13 @@ do_update() {
         return
     fi
     
+    # Usuń stary symlink przed aktualizacją
+    if [ -L "$SYMLINK_PATH" ]; then
+        info "Usuwanie starego symlinku przed aktualizacją..."
+        sudo rm -f "$SYMLINK_PATH" 2>/dev/null
+        echo ""
+    fi
+    
     info "Pobieranie aktualizacji..."
     echo ""
     
@@ -419,11 +446,13 @@ do_update() {
     echo ""
     success "Zaktualizowano pomyślnie!"
     
-    # Sprawdź i napraw symlink jeśli potrzeba
-    if [ ! -L "$SYMLINK_PATH" ] || [ ! -e "$SYMLINK_PATH" ]; then
-        echo ""
-        warning "Symlink nie działa, naprawa..."
-        create_symlink "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH"
+    # Utwórz nowy symlink
+    echo ""
+    info "Ponowne tworzenie symlinku..."
+    if create_symlink "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH"; then
+        success "Symlink odnowiony!"
+    else
+        warning "Nie udało się utworzyć symlinku"
     fi
     
     echo ""
