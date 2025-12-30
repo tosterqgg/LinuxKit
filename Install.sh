@@ -159,6 +159,55 @@ select_clone_method() {
     done
 }
 
+create_symlink() {
+    local target="$1"
+    local link="$2"
+    
+    info "Tworzenie linku systemowego..."
+    
+    # Usuń stary link jeśli istnieje
+    if [ -L "$link" ] || [ -e "$link" ]; then
+        if sudo rm -f "$link" 2>/dev/null; then
+            info "Usunięto stary link"
+        else
+            warning "Nie można usunąć starego linku"
+            return 1
+        fi
+    fi
+    
+    # Upewnij się że katalog docelowy istnieje
+    local link_dir="$(dirname "$link")"
+    if [ ! -d "$link_dir" ]; then
+        if ! sudo mkdir -p "$link_dir" 2>/dev/null; then
+            warning "Nie można utworzyć katalogu $link_dir"
+            return 1
+        fi
+    fi
+    
+    # Utwórz nowy link
+    if sudo ln -sf "$target" "$link" 2>/dev/null; then
+        # Weryfikuj czy link działa
+        if [ -L "$link" ] && [ -e "$link" ]; then
+            success "Link utworzony: $link -> $target"
+            
+            # Sprawdź czy link jest wykonywalny
+            if [ -x "$link" ]; then
+                success "Link jest wykonywalny"
+                return 0
+            else
+                warning "Link nie jest wykonywalny"
+                return 1
+            fi
+        else
+            warning "Link utworzony ale nie działa poprawnie"
+            return 1
+        fi
+    else
+        warning "Nie można utworzyć linku"
+        return 1
+    fi
+}
+
 do_install() {
     clear
     echo -e "${BLUE}╔════════════════════════════════════╗${NC}"
@@ -226,39 +275,43 @@ do_install() {
     info "Tworzenie skryptu uruchamiającego..."
     cat > "$INSTALL_DIR/ui-manager" << 'EOFWRAPPER'
 #!/bin/bash
+# UI Manager wrapper script
+
 # Znajdź prawdziwą lokalizację skryptu (obsługa symlinków)
-if [ -L "$0" ]; then
-    SCRIPT_PATH="$(readlink -f "$0")"
-else
-    SCRIPT_PATH="$0"
+SCRIPT_SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SCRIPT_SOURCE" ]; do
+    SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+    SCRIPT_SOURCE="$(readlink "$SCRIPT_SOURCE")"
+    [[ $SCRIPT_SOURCE != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+
+# Przejdź do katalogu ze skryptem
+cd "$SCRIPT_DIR" || {
+    echo "Błąd: Nie można przejść do katalogu $SCRIPT_DIR"
+    exit 1
+}
+
+# Sprawdź czy ui.sh istnieje
+if [ ! -f "$SCRIPT_DIR/ui.sh" ]; then
+    echo "Błąd: Nie znaleziono ui.sh w $SCRIPT_DIR"
+    exit 1
 fi
-SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
-cd "$SCRIPT_DIR" || exit 1
 
 # Uruchom ui.sh
 exec bash "$SCRIPT_DIR/ui.sh" "$@"
 EOFWRAPPER
+    
     chmod +x "$INSTALL_DIR/ui-manager"
     
-    # Utwórz symlink systemowy
-    info "Tworzenie linku systemowego..."
+    echo ""
     
-    # Usuń stary link jeśli istnieje
-    [ -L "$SYMLINK_PATH" ] && { [ -w "$(dirname "$SYMLINK_PATH")" ] && rm -f "$SYMLINK_PATH" || sudo rm -f "$SYMLINK_PATH"; }
-    
-    # Utwórz nowy link
-    if [ -w "$(dirname "$SYMLINK_PATH")" ]; then
-        ln -sf "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH" 2>/dev/null
+    # Próbuj utworzyć symlink
+    if create_symlink "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH"; then
+        success "Symlink zainstalowany poprawnie!"
     else
-        sudo ln -sf "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH" 2>/dev/null
-    fi
-    
-    # Sprawdź czy link działa
-    if [ -L "$SYMLINK_PATH" ] && [ -x "$SYMLINK_PATH" ]; then
-        success "Link utworzony i działa: $SYMLINK_PATH"
-    else
-        warning "Link nie został utworzony (nie krytyczne)"
-        warning "Użyj: $INSTALL_DIR/ui-manager"
+        warning "Nie udało się utworzyć symlinku systemowego"
+        info "Możesz uruchomić przez: $INSTALL_DIR/ui-manager"
     fi
     
     echo ""
@@ -267,14 +320,17 @@ EOFWRAPPER
     echo -e "${GREEN}╚════════════════════════════════════╝${NC}"
     echo ""
     info "Uruchom przez:"
-    echo "  ${YELLOW}ui-manager${NC}"
-    echo "  lub: ${YELLOW}$INSTALL_DIR/ui.sh${NC}"
+    
+    if [ -L "$SYMLINK_PATH" ] && [ -x "$SYMLINK_PATH" ]; then
+        echo "  ${YELLOW}ui-manager${NC}"
+    fi
+    echo "  ${YELLOW}$INSTALL_DIR/ui-manager${NC}"
     echo ""
     
     read -p "Uruchomić teraz? (y/n): " run_now
     if [[ "$run_now" =~ ^[Yy]$ ]]; then
         echo ""
-        exec "$INSTALL_DIR/ui.sh"
+        exec "$INSTALL_DIR/ui-manager"
     fi
 }
 
@@ -305,16 +361,20 @@ do_uninstall() {
     echo ""
     info "Usuwanie plików..."
     
-    # Usuń katalog
-    rm -rf "$INSTALL_DIR"
-    
     # Usuń symlink
-    if [ -L "$SYMLINK_PATH" ]; then
-        if [ -w "/usr/local/bin" ]; then
-            rm "$SYMLINK_PATH"
+    if [ -L "$SYMLINK_PATH" ] || [ -e "$SYMLINK_PATH" ]; then
+        if sudo rm -f "$SYMLINK_PATH" 2>/dev/null; then
+            success "Usunięto symlink"
         else
-            sudo rm "$SYMLINK_PATH"
+            warning "Nie można usunąć symlinku"
         fi
+    fi
+    
+    # Usuń katalog
+    if rm -rf "$INSTALL_DIR"; then
+        success "Usunięto pliki instalacyjne"
+    else
+        error "Błąd podczas usuwania plików"
     fi
     
     echo ""
@@ -341,7 +401,7 @@ do_update() {
     info "Pobieranie aktualizacji..."
     echo ""
     
-    cd "$INSTALL_DIR" || { error "Nie można wejść do katalogu!"; return 1; }
+    cd "$INSTALL_DIR" || { error "Nie można wejść do katalogu!"; read -p "Enter..."; return 1; }
     
     # Pobierz aktualizacje
     if ! git pull 2>&1; then
@@ -358,6 +418,14 @@ do_update() {
     
     echo ""
     success "Zaktualizowano pomyślnie!"
+    
+    # Sprawdź i napraw symlink jeśli potrzeba
+    if [ ! -L "$SYMLINK_PATH" ] || [ ! -e "$SYMLINK_PATH" ]; then
+        echo ""
+        warning "Symlink nie działa, naprawa..."
+        create_symlink "$INSTALL_DIR/ui-manager" "$SYMLINK_PATH"
+    fi
+    
     echo ""
     read -p "Enter..."
 }
