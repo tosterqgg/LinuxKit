@@ -61,6 +61,7 @@ check_dependencies() {
 
 select_package_manager() {
     local selected=0 max_options=8
+    printf '\033[?1000h\033[?1002h\033[?1006h'
     while true; do
         clear; echo "╔════════════════════════════════════╗"; echo "║   WYBIERZ MENEDŻER PAKIETÓW        ║"; echo "╚════════════════════════════════════╝"; echo ""
         [ $selected -eq 0 ] && echo -e "${GREEN}> [pacman (Arch)]${NC}" || echo "  [pacman (Arch)]"
@@ -72,12 +73,25 @@ select_package_manager() {
         [ $selected -eq 6 ] && echo -e "${GREEN}> [apk (Alpine)]${NC}" || echo "  [apk (Alpine)]"
         [ $selected -eq 7 ] && echo -e "${GREEN}> [winget (Windows)]${NC}" || echo "  [winget (Windows)]"
         [ $selected -eq 8 ] && echo -e "${GREEN}> [Autowykryj]${NC}" || echo "  [Autowykryj]"
-        echo ""; echo "Strzałki ↑↓, Enter"
+        echo ""; echo "Strzałki ↑↓ lub dotknij, Enter"
         IFS= read -rsn1 key
-        if [[ $key == $'\x1b' ]]; then read -rsn2 -t 0.1 key
-            case "$key" in '[A') ((selected--)); [ $selected -lt 0 ] && selected=$max_options ;;
-                           '[B') ((selected++)); [ $selected -gt $max_options ] && selected=0 ;; esac
-        elif [[ $key == "" ]]; then
+        if [[ $key == $'\x1b' ]]; then
+            IFS= read -rsn1 -t 0.01 key2
+            if [[ $key2 == '[' ]]; then
+                IFS= read -rsn1 -t 0.01 key3
+                if [[ $key3 == 'A' ]]; then ((selected--)); [ $selected -lt 0 ] && selected=$max_options
+                elif [[ $key3 == 'B' ]]; then ((selected++)); [ $selected -gt $max_options ] && selected=0
+                elif [[ $key3 == '<' ]]; then
+                    local mouse_seq="<"
+                    while IFS= read -rsn1 -t 0.01 char; do mouse_seq+="$char"; [[ $char == 'M' || $char == 'm' ]] && break; done
+                    if [[ "$mouse_seq" =~ \<([0-9]+)\;([0-9]+)\;([0-9]+)M ]]; then
+                        local y="${BASH_REMATCH[3]}" clicked=$((y - 5))
+                        if [ $clicked -ge 0 ] && [ $clicked -le $max_options ]; then selected=$clicked; fi
+                    fi
+                fi
+            fi
+        fi
+        [[ $key == "" ]] && {
             case $selected in
                 0) PKG_MANAGER="pacman"; PKG_MANAGER_NAME="Pacman (Arch)"; return ;;
                 1) PKG_MANAGER="apt"; PKG_MANAGER_NAME="APT (Debian/Ubuntu)"; return ;;
@@ -89,7 +103,7 @@ select_package_manager() {
                 7) PKG_MANAGER="winget"; PKG_MANAGER_NAME="Winget (Windows)"; return ;;
                 8) autodetect_package_manager; return ;;
             esac
-        fi
+        }
     done
 }
 
@@ -169,14 +183,28 @@ custom_command() {
 }
 update_system() {
     local sel=0 max=1
+    printf '\033[?1000h\033[?1002h\033[?1006h'
     while true; do
         clear; echo "╔════════════════════════════════════╗"; echo "║       AKTUALIZACJA SYSTEMU         ║"; echo "╚════════════════════════════════════╝"; echo ""
         [ $sel -eq 0 ] && echo -e "${GREEN}> [Cały system]${NC}" || echo "  [Cały system]"
         [ $sel -eq 1 ] && echo -e "${GREEN}> [Wybrany pakiet]${NC}" || echo "  [Wybrany pakiet]"
-        echo ""; echo "↑↓, Enter, q=wyjście"
+        echo ""; echo "↑↓ lub dotknij, Enter, q=wyjście"
         IFS= read -rsn1 key
-        if [[ $key == $'\x1b' ]]; then read -rsn2 -t 0.1 key
-            case "$key" in '[A') ((sel--)); [ $sel -lt 0 ] && sel=$max ;; '[B') ((sel++)); [ $sel -gt $max ] && sel=0 ;; esac
+        if [[ $key == $'\x1b' ]]; then
+            IFS= read -rsn1 -t 0.01 key2
+            if [[ $key2 == '[' ]]; then
+                IFS= read -rsn1 -t 0.01 key3
+                if [[ $key3 == 'A' ]]; then ((sel--)); [ $sel -lt 0 ] && sel=$max
+                elif [[ $key3 == 'B' ]]; then ((sel++)); [ $sel -gt $max ] && sel=0
+                elif [[ $key3 == '<' ]]; then
+                    local mouse_seq="<"
+                    while IFS= read -rsn1 -t 0.01 char; do mouse_seq+="$char"; [[ $char == 'M' || $char == 'm' ]] && break; done
+                    if [[ "$mouse_seq" =~ \<([0-9]+)\;([0-9]+)\;([0-9]+)M ]]; then
+                        local y="${BASH_REMATCH[3]}" clicked=$((y - 5))
+                        [ $clicked -ge 0 ] && [ $clicked -le $max ] && sel=$clicked
+                    fi
+                fi
+            fi
         elif [[ $key == "q" ]] || [[ $key == "Q" ]]; then return
         elif [[ $key == "" ]]; then
             clear
@@ -266,15 +294,29 @@ update_specific_package() {
 
 install_de() {
     local sel=0 max=2
+    printf '\033[?1000h\033[?1002h\033[?1006h'
     while true; do
         clear; echo "╔════════════════════════════════════╗"; echo "║    INSTALACJA ŚRODOWISKA DESKTOP   ║"; echo "╚════════════════════════════════════╝"; echo ""
         [ $sel -eq 0 ] && echo -e "${GREEN}> [KDE Plasma]${NC}" || echo "  [KDE Plasma]"
         [ $sel -eq 1 ] && echo -e "${GREEN}> [GNOME]${NC}" || echo "  [GNOME]"
         [ $sel -eq 2 ] && echo -e "${GREEN}> [XFCE]${NC}" || echo "  [XFCE]"
-        echo ""; echo "↑↓, Enter, q=wyjście"
+        echo ""; echo "↑↓ lub dotknij, Enter, q=wyjście"
         IFS= read -rsn1 key
-        if [[ $key == $'\x1b' ]]; then read -rsn2 -t 0.1 key
-            case "$key" in '[A') ((sel--)); [ $sel -lt 0 ] && sel=$max ;; '[B') ((sel++)); [ $sel -gt $max ] && sel=0 ;; esac
+        if [[ $key == $'\x1b' ]]; then
+            IFS= read -rsn1 -t 0.01 key2
+            if [[ $key2 == '[' ]]; then
+                IFS= read -rsn1 -t 0.01 key3
+                if [[ $key3 == 'A' ]]; then ((sel--)); [ $sel -lt 0 ] && sel=$max
+                elif [[ $key3 == 'B' ]]; then ((sel++)); [ $sel -gt $max ] && sel=0
+                elif [[ $key3 == '<' ]]; then
+                    local mouse_seq="<"
+                    while IFS= read -rsn1 -t 0.01 char; do mouse_seq+="$char"; [[ $char == 'M' || $char == 'm' ]] && break; done
+                    if [[ "$mouse_seq" =~ \<([0-9]+)\;([0-9]+)\;([0-9]+)M ]]; then
+                        local y="${BASH_REMATCH[3]}" clicked=$((y - 5))
+                        [ $clicked -ge 0 ] && [ $clicked -le $max ] && sel=$clicked
+                    fi
+                fi
+            fi
         elif [[ $key == "q" ]] || [[ $key == "Q" ]]; then return
         elif [[ $key == "" ]]; then
             clear
@@ -307,6 +349,7 @@ install_de() {
 }
 helpful_commands() {
     local sel=0 max=12
+    printf '\033[?1000h\033[?1002h\033[?1006h'
     while true; do
         clear; echo "╔════════════════════════════════════╗"; echo "║        POMOCNE KOMENDY             ║"; echo "╚════════════════════════════════════╝"; echo ""
         [ $sel -eq 0 ] && echo -e "${GREEN}> [Wyczyść cache]${NC}" || echo "  [Wyczyść cache]"
@@ -322,10 +365,23 @@ helpful_commands() {
         [ $sel -eq 10 ] && echo -e "${GREEN}> [Downgrade]${NC}" || echo "  [Downgrade]"
         [ $sel -eq 11 ] && echo -e "${GREEN}> [Blokada pakietu]${NC}" || echo "  [Blokada pakietu]"
         [ $sel -eq 12 ] && echo -e "${GREEN}> [Powrót]${NC}" || echo "  [Powrót]"
-        echo ""; echo "↑↓, Enter"
+        echo ""; echo "↑↓ lub dotknij, Enter"
         IFS= read -rsn1 key
-        if [[ $key == $'\x1b' ]]; then read -rsn2 -t 0.1 key
-            case "$key" in '[A') ((sel--)); [ $sel -lt 0 ] && sel=$max ;; '[B') ((sel++)); [ $sel -gt $max ] && sel=0 ;; esac
+        if [[ $key == $'\x1b' ]]; then
+            IFS= read -rsn1 -t 0.01 key2
+            if [[ $key2 == '[' ]]; then
+                IFS= read -rsn1 -t 0.01 key3
+                if [[ $key3 == 'A' ]]; then ((sel--)); [ $sel -lt 0 ] && sel=$max
+                elif [[ $key3 == 'B' ]]; then ((sel++)); [ $sel -gt $max ] && sel=0
+                elif [[ $key3 == '<' ]]; then
+                    local mouse_seq="<"
+                    while IFS= read -rsn1 -t 0.01 char; do mouse_seq+="$char"; [[ $char == 'M' || $char == 'm' ]] && break; done
+                    if [[ "$mouse_seq" =~ \<([0-9]+)\;([0-9]+)\;([0-9]+)M ]]; then
+                        local y="${BASH_REMATCH[3]}" clicked=$((y - 5))
+                        [ $clicked -ge 0 ] && [ $clicked -le $max ] && sel=$clicked
+                    fi
+                fi
+            fi
         elif [[ $key == "" ]]; then
             clear
             case $sel in
