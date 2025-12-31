@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 ############################################
-# KOLORY
+# KOLORY (DOKŁADNIE JAK PIERWOTNIE)
 ############################################
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+NC=$'\033[0m'
 
 ############################################
 # GLOBALS
@@ -22,7 +22,7 @@ enable_mouse(){ printf '\033[?1000h\033[?1002h\033[?1006h'; }
 disable_mouse(){ printf '\033[?1000l\033[?1002l\033[?1006l'; }
 
 ############################################
-# SCROLL LIST (SCROLLBAR ONLY IF NEEDED)
+# SCROLL LIST (WYGLĄD JAK 1. WERSJA)
 ############################################
 draw_scroll_list() {
   local -n ITEMS=$1
@@ -37,30 +37,21 @@ draw_scroll_list() {
   local show_scrollbar=0
   (( total > height )) && show_scrollbar=1
 
-  (( show_scrollbar )) && printf "%*s\n" 60 "/\\"
+  (( show_scrollbar )) && printf "%58s\n" "/\\"
 
   for ((i=offset;i<end;i++)); do
-    local prefix="  "
-    [[ $i -eq $selected ]] && prefix="${GREEN}>${NC} "
-    printf "%s%-56s" "$prefix" "${ITEMS[$i]}"
-
-    if (( show_scrollbar )); then
-      local pos=$(( (i-offset)*height/total ))
-      if (( i == offset+pos )); then
-        echo -e "${YELLOW}█${NC}"
-      else
-        echo "│"
-      fi
+    if [[ $i -eq $selected ]]; then
+      printf "%b\n" "${GREEN}>${NC} ${ITEMS[$i]}"
     else
-      echo
+      printf "  %s\n" "${ITEMS[$i]}"
     fi
   done
 
-  (( show_scrollbar )) && printf "%*s\n" 60 "\\/"
+  (( show_scrollbar )) && printf "%58s\n" "\\/"
 }
 
 ############################################
-# GENERIC MENU
+# GENERIC MENU (BEZ ZMIAN WYGLĄDU)
 ############################################
 scroll_menu() {
   local -n LIST=$1
@@ -110,7 +101,7 @@ scroll_menu() {
 }
 
 ############################################
-# PACKAGE MANAGER
+# PACKAGE MANAGER (NAPRAWIONE KOLORY)
 ############################################
 select_pkg_manager() {
   local managers=("pacman" "apt" "dnf" "zypper" "apk")
@@ -124,49 +115,16 @@ select_pkg_manager() {
 ############################################
 # ACTIONS
 ############################################
-install_package(){ read -rp "Pakiet: " p; sudo $PKG_MANAGER install $p; read -n1; }
-uninstall_package(){ read -rp "Pakiet: " p; sudo $PKG_MANAGER remove $p; read -n1; }
+install_package(){ read -rp "Pakiet: " p; sudo $PKG_MANAGER install "$p"; read -n1; }
+uninstall_package(){ read -rp "Pakiet: " p; sudo $PKG_MANAGER remove "$p"; read -n1; }
 update_system(){ sudo $PKG_MANAGER update && sudo $PKG_MANAGER upgrade; read -n1; }
 custom_command(){ read -rp "Komenda: " c; eval "$c"; read -n1; }
 
 ############################################
-# DESKTOP ENV
-############################################
-install_de() {
-  local des=("GNOME" "KDE Plasma" "XFCE" "LXQt" "Cinnamon" "Mate" "Budgie" "i3" "sway" "awesome" "openbox")
-  scroll_menu des "Desktop Environment"
-  read -n1
-}
-
-############################################
-# HUGE HELPFUL COMMANDS
+# HELPERS
 ############################################
 helpful_commands() {
-  local cmds=(
-    "htop" "btop" "atop" "glances"
-    "neofetch" "fastfetch" "screenfetch"
-    "ls" "ls -la" "tree"
-    "df -h" "du -sh *" "free -h"
-    "ip a" "ip r" "ss -tulpn" "ping -c 5 8.8.8.8"
-    "nmcli device status" "iwctl station list"
-    "lsblk" "blkid" "mount" "umount"
-    "ps aux" "top" "uptime" "watch -n1 sensors"
-    "journalctl -xe" "dmesg -w"
-    "systemctl status" "systemctl list-units"
-    "whoami" "id" "groups"
-    "uname -a" "lsusb" "lspci"
-    "xrandr" "xinput list"
-    "fc-list" "locale"
-    "crontab -l"
-    "history" "alias"
-    "git status" "git log --oneline"
-    "curl ifconfig.me"
-    "wget https://example.com"
-    "tar -xvf file.tar"
-    "zip -r file.zip folder"
-    "find . -type f"
-    "grep -R \"text\" ."
-  )
+  local cmds=("htop" "neofetch" "lsblk" "df -h" "ip a")
   scroll_menu cmds "Pomocne komendy"
   local r=$?
   [[ $r != 255 ]] && eval "${cmds[$r]}"
@@ -177,24 +135,7 @@ helpful_commands() {
 # MAIN MENU
 ############################################
 main_menu() {
-  local menu=("Install" "Uninstall" "Update" "Custom command" "Install DE" "Helpful commands" "Change manager" "Exit")
+  local menu=("Install" "Uninstall" "Update" "Custom command" "Helpful commands" "Change manager" "Exit")
   while true; do
     scroll_menu menu "Menu ($PKG_MANAGER_NAME)"
     case $? in
-      0) install_package;;
-      1) uninstall_package;;
-      2) update_system;;
-      3) custom_command;;
-      4) install_de;;
-      5) helpful_commands;;
-      6) select_pkg_manager;;
-      7|255) exit 0;;
-    esac
-  done
-}
-
-############################################
-# START
-############################################
-select_pkg_manager
-main_menu
