@@ -65,7 +65,7 @@ select_package_manager() {
     while true; do
         clear; echo "╔════════════════════════════════════╗"; echo "║   WYBIERZ MENEDŻER PAKIETÓW        ║"; echo "╚════════════════════════════════════╝"; echo ""
         [ $selected -eq 0 ] && echo -e "${GREEN}> [pacman (Arch)]${NC}" || echo "  [pacman (Arch)]"
-        [ $selected -eq 1 ] && echo -e "${GREEN}> [apt (Debian/Ubuntu)]${NC}" || echo "  [apt (Debian/Ubuntu)]"
+        [ $selected -eq 1 ] && echo -e "${GREEN}> [apt (Debian/Ubuntu/Zorin OS)]${NC}" || echo "  [apt (Debian/Ubuntu)]"
         [ $selected -eq 2 ] && echo -e "${GREEN}> [dnf (Fedora)]${NC}" || echo "  [dnf (Fedora)]"
         [ $selected -eq 3 ] && echo -e "${GREEN}> [yum (CentOS/RHEL)]${NC}" || echo "  [yum (CentOS/RHEL)]"
         [ $selected -eq 4 ] && echo -e "${GREEN}> [zypper (openSUSE)]${NC}" || echo "  [zypper (openSUSE)]"
