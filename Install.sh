@@ -18,6 +18,7 @@ warning() { echo -e "${YELLOW}[⚠]${NC} $*"; }
 show_menu() {
     local selected=$1
     clear
+    printf '\033[?1000h\033[?1002h\033[?1006h'
     echo -e "${BLUE}╔════════════════════════════════════╗${NC}"
     echo -e "${BLUE}║     UI PACKAGE MANAGER INSTALLER   ║${NC}"
     echo -e "${BLUE}╚════════════════════════════════════╝${NC}"
@@ -29,7 +30,7 @@ show_menu() {
     [ $selected -eq 3 ] && echo -e "${GREEN}> [Exit]${NC}" || echo "  [Exit]"
     
     echo ""
-    echo "Użyj strzałek ↑↓, Enter"
+    echo "Użyj strzałek ↑↓ lub dotknij, Enter"
 }
 
 check_git() {
@@ -69,6 +70,8 @@ select_clone_method() {
     local selected=0
     local max_options=2
     
+    printf '\033[?1000h\033[?1002h\033[?1006h'
+    
     while true; do
         clear
         echo -e "${BLUE}╔════════════════════════════════════╗${NC}"
@@ -81,16 +84,35 @@ select_clone_method() {
         [ $selected -eq 2 ] && echo -e "${GREEN}> [HTTPS (publiczne repo)]${NC}" || echo "  [HTTPS (publiczne repo)]"
         
         echo ""
-        echo "Strzałki ↑↓, Enter"
+        echo "Strzałki ↑↓ lub dotknij, Enter"
         
         IFS= read -rsn1 key
         
         if [[ $key == $'\x1b' ]]; then
-            read -rsn2 -t 0.1 key
-            case "$key" in
-                '[A') ((selected--)); [ $selected -lt 0 ] && selected=$max_options ;;
-                '[B') ((selected++)); [ $selected -gt $max_options ] && selected=0 ;;
-            esac
+            IFS= read -rsn1 -t 0.01 key2
+            if [[ $key2 == '[' ]]; then
+                IFS= read -rsn1 -t 0.01 key3
+                case "$key3" in
+                    'A') ((selected--)); [ $selected -lt 0 ] && selected=$max_options ;;
+                    'B') ((selected++)); [ $selected -gt $max_options ] && selected=0 ;;
+                    '<')
+                        local mouse_seq="<"
+                        while IFS= read -rsn1 -t 0.01 char; do 
+                            mouse_seq+="$char"
+                            [[ $char == 'M' || $char == 'm' ]] && break
+                        done
+                        
+                        if [[ "$mouse_seq" =~ \<([0-9]+)\;([0-9]+)\;([0-9]+)M ]]; then
+                            local y="${BASH_REMATCH[3]}"
+                            local clicked=$((y - 5))
+                            
+                            if [ $clicked -ge 0 ] && [ $clicked -le $max_options ]; then
+                                selected=$clicked
+                            fi
+                        fi
+                        ;;
+                esac
+            fi
         elif [[ $key == "" ]]; then
             case $selected in
                 0)
@@ -468,25 +490,53 @@ main() {
     local selected=0
     local max_options=3
     
+    printf '\033[?1000h\033[?1002h\033[?1006h'
+    
     while true; do
         show_menu $selected
         IFS= read -rsn1 key
         
         if [[ $key == $'\x1b' ]]; then
-            read -rsn2 -t 0.1 key
-            case "$key" in
-                '[A') ((selected--)); [ $selected -lt 0 ] && selected=$max_options ;;
-                '[B') ((selected++)); [ $selected -gt $max_options ] && selected=0 ;;
-            esac
+            IFS= read -rsn1 -t 0.01 key2
+            if [[ $key2 == '[' ]]; then
+                IFS= read -rsn1 -t 0.01 key3
+                case "$key3" in
+                    'A') ((selected--)); [ $selected -lt 0 ] && selected=$max_options ;;
+                    'B') ((selected++)); [ $selected -gt $max_options ] && selected=0 ;;
+                    '<') 
+                        # Obsługa myszy/dotyku
+                        local mouse_seq="<"
+                        while IFS= read -rsn1 -t 0.01 char; do 
+                            mouse_seq+="$char"
+                            [[ $char == 'M' || $char == 'm' ]] && break
+                        done
+                        
+                        # Parse mouse coordinates
+                        if [[ "$mouse_seq" =~ \<([0-9]+)\;([0-9]+)\;([0-9]+)M ]]; then
+                            local button="${BASH_REMATCH[1]}"
+                            local y="${BASH_REMATCH[3]}"
+                            local clicked=$((y - 5))
+                            
+                            # Mapowanie: linia 5=Install(0), 6=Uninstall(1), 7=Update(2), 8=Exit(3)
+                            if [ $clicked -ge 0 ] && [ $clicked -le $max_options ]; then
+                                selected=$clicked
+                            fi
+                        fi
+                        ;;
+                esac
+            fi
         elif [[ $key == "" ]]; then
             case $selected in
                 0) do_install ;;
                 1) do_uninstall ;;
                 2) do_update ;;
-                3) clear; echo "Do widzenia!"; exit 0 ;;
+                3) printf '\033[?1000l\033[?1002l\033[?1006l'; clear; echo "Do widzenia!"; exit 0 ;;
             esac
         fi
     done
 }
+
+# Wyłącz obsługę myszy przy wyjściu
+trap 'printf "\033[?1000l\033[?1002l\033[?1006l"' EXIT
 
 main
